@@ -1,4 +1,4 @@
-const API_BASE = "https://tom-todd-shortcuts-berlin.trycloudflare.com/api";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export function getToken() {
   return localStorage.getItem("token");
