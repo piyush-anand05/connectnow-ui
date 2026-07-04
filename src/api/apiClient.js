@@ -14,6 +14,8 @@ export function logout() {
   localStorage.removeItem("user");
 }
 
+console.log("API_BASE =", API_BASE);
+
 export async function apiRequest(path, options = {}) {
   const token = getToken();
 
