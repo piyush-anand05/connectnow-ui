@@ -1,5 +1,8 @@
-// Temporary for debugging
 const API_BASE = "https://connectnow-40rl.onrender.com/api";
+
+alert("NEW BUILD LOADED");
+
+console.log("API_BASE =", API_BASE);
 
 export function getToken() {
   return localStorage.getItem("token");
