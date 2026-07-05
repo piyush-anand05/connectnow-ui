@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL + "/api";
+// Temporary for debugging
+const API_BASE = "https://connectnow-40rl.onrender.com/api";
 
 export function getToken() {
   return localStorage.getItem("token");
