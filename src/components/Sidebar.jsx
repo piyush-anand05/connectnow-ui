@@ -1,137 +1,104 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-
+import { NavLink, useNavigate } from "react-router-dom";
 import {
-  Home as HomeIcon,
-  PlusSquare,
-  MessageCircle,
-  Users,
-  Briefcase,
-  FileText,
-  Inbox
+  Bell,
+  Bookmark,
+  BriefcaseBusiness,
+  Compass,
+  LogOut,
+  MessageSquareText,
+  PenLine,
+  Radar,
+  Settings,
+  UserRound,
+  UsersRound,
+  Newspaper,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import BrandMark from "./common/BrandMark";
 
-import { getMyConversations } from "../api/messages";
-import { getPostChatThreads } from "../api/postChat";
+const mainNav = [
+  { label: "Local Pulse", path: "/home", icon: Radar },
+  { label: "Discover People", path: "/network", icon: UsersRound },
+  { label: "Create Post", path: "/create-post", icon: PenLine },
+  { label: "Local Gigs", path: "/gigs", icon: BriefcaseBusiness },
+  { label: "Inbox", path: "/messages", icon: MessageSquareText },
+];
 
-export default function Sidebar({ active = "home" }) {
-  const navigate = useNavigate();
+const manageNav = [
+  { label: "Notifications", path: "/notifications", icon: Bell },
+  { label: "Post Replies", path: "/post-replies", icon: Newspaper },
+  { label: "My Posts", path: "/my-posts", icon: Compass },
+  { label: "Saved", path: "/saved-posts", icon: Bookmark },
+];
 
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [unreadPostReplies, setUnreadPostReplies] = useState(0);
+const accountNav = [
+  { label: "Profile", path: "/profile", icon: UserRound },
+  { label: "Settings", path: "/settings", icon: Settings },
+];
 
-  useEffect(() => {
-    loadCounts();
-
-    const interval = setInterval(loadCounts, 8000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  async function loadCounts() {
-    try {
-      const conversations = await getMyConversations();
-
-      const msgCount = conversations.reduce(
-        (sum, conv) => sum + (conv.unread_count || 0),
-        0
-      );
-
-      setUnreadMessages(msgCount);
-    } catch {
-      setUnreadMessages(0);
-    }
-
-    try {
-      const threads = await getPostChatThreads();
-
-      const replyCount = threads.reduce(
-        (sum, thread) => sum + (thread.unread_count || 0),
-        0
-      );
-
-      setUnreadPostReplies(replyCount);
-    } catch {
-      setUnreadPostReplies(0);
-    }
-  }
+function SidebarLink({ item }) {
+  const Icon = item.icon;
 
   return (
-    <aside className="sidebar premium-sidebar">
-      <div className="brand">
-        <div className="brand-logo">CN</div>
+    <NavLink
+      to={item.path}
+      className={({ isActive }) =>
+        ["cn-sidebar-link", isActive ? "cn-sidebar-link-active" : ""].filter(Boolean).join(" ")
+      }
+    >
+      <span className="cn-sidebar-link-icon"><Icon size={19} /></span>
+      <span className="cn-sidebar-link-text text-one-line">{item.label}</span>
+    </NavLink>
+  );
+}
 
-        <div>
-          <h2>ConnectNow</h2>
-          <p>Community Network</p>
-        </div>
+function Sidebar() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
+  };
+
+  return (
+    <aside className="cn-sidebar cn-sidebar-living">
+      <div className="cn-sidebar-brand cn-sidebar-brand-living">
+        <BrandMark />
       </div>
 
-      <nav>
-        <button
-          className={`menu-item ${active === "home" ? "active" : ""}`}
-          onClick={() => navigate("/home")}
-        >
-          <HomeIcon size={20} />
-          Home
-        </button>
+      <div className="cn-sidebar-section">
+        <p className="cn-sidebar-section-label">Discover</p>
+        <nav className="cn-sidebar-nav" aria-label="Main navigation">
+          {mainNav.map((item) => <SidebarLink key={item.path} item={item} />)}
+        </nav>
+      </div>
 
-        <button
-          className={`menu-item ${active === "create" ? "active" : ""}`}
-          onClick={() => navigate("/create-post")}
-        >
-          <PlusSquare size={20} />
-          Create Post
-        </button>
+      <div className="cn-sidebar-section">
+        <p className="cn-sidebar-section-label">Your Local Layer</p>
+        <nav className="cn-sidebar-nav" aria-label="Manage navigation">
+          {manageNav.map((item) => <SidebarLink key={item.path} item={item} />)}
+        </nav>
+      </div>
 
-        <button
-          className={`menu-item ${active === "my-posts" ? "active" : ""}`}
-          onClick={() => navigate("/my-posts")}
-        >
-          <FileText size={20} />
-          My Posts
-        </button>
+      <div className="cn-sidebar-section">
+        <p className="cn-sidebar-section-label">Account</p>
+        <nav className="cn-sidebar-nav" aria-label="Account navigation">
+          {accountNav.map((item) => <SidebarLink key={item.path} item={item} />)}
+        </nav>
+      </div>
 
-        <button
-          className={`menu-item ${active === "messages" ? "active" : ""}`}
-          onClick={() => navigate("/messages")}
-        >
-          <MessageCircle size={20} />
-          Messages
-          {unreadMessages > 0 && (
-            <span className="sidebar-badge">{unreadMessages}</span>
-          )}
-        </button>
+      <div className="cn-sidebar-footer-note">
+        <strong>Living Locality</strong>
+        <span>People, help, gigs and events around your active city.</span>
+      </div>
 
-        <button
-          className={`menu-item ${
-            active === "post-replies" ? "active" : ""
-          }`}
-          onClick={() => navigate("/post-replies")}
-        >
-          <Inbox size={20} />
-          Post Replies
-          {unreadPostReplies > 0 && (
-            <span className="sidebar-badge">{unreadPostReplies}</span>
-          )}
-        </button>
-
-        <button
-          className={`menu-item ${active === "network" ? "active" : ""}`}
-          onClick={() => navigate("/network")}
-        >
-          <Users size={20} />
-          My Network
-        </button>
-
-        <button
-          className={`menu-item ${active === "gigs" ? "active" : ""}`}
-          onClick={() => navigate("/gigs")}
-        >
-          <Briefcase size={20} />
-          Gig Marketplace
-        </button>
-      </nav>
+      <button type="button" className="cn-sidebar-link cn-sidebar-logout" onClick={handleLogout}>
+        <span className="cn-sidebar-link-icon"><LogOut size={19} /></span>
+        <span className="cn-sidebar-link-text">Logout</span>
+      </button>
     </aside>
   );
 }
+
+export default Sidebar;

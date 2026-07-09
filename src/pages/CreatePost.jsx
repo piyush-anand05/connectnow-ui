@@ -14,33 +14,23 @@ import {
   Users,
   ChevronDown,
   ChevronUp,
-  Eye
+  Eye,
 } from "lucide-react";
 
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
+import { createPost, updatePost } from "../api/posts";
 
-import {
-  createPost,
-  updatePost
-} from "../api/posts";
-
-import {
-  searchLocation,
-  saveUserLocation
-} from "../api/location";
+import { searchLocation, saveUserLocation } from "../api/location";
 
 import "../styles/home.css";
 
 export default function CreatePost() {
   const navigate = useNavigate();
 
-  const user =
-    JSON.parse(localStorage.getItem("user")) || {
-      name: "Amit",
-      city: "Pune",
-      active_city: "Pune"
-    };
+  const user = JSON.parse(localStorage.getItem("user")) || {
+    name: "Local explorer",
+    city: "Pune",
+    active_city: "Pune",
+  };
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -54,7 +44,7 @@ export default function CreatePost() {
     "Events",
     "Community",
     "Arts",
-    "Other"
+    "Other",
   ];
 
   const cities = [
@@ -65,7 +55,7 @@ export default function CreatePost() {
     "Hyderabad",
     "Chennai",
     "Kolkata",
-    "Other"
+    "Other",
   ];
 
   const emptyForm = {
@@ -94,7 +84,7 @@ export default function CreatePost() {
     capacity: "",
     externalLink: "",
     additionalNotes: "",
-    allowPrivateReplies: true
+    allowPrivateReplies: true,
   };
 
   const [form, setForm] = useState(emptyForm);
@@ -108,7 +98,10 @@ export default function CreatePost() {
   const [locationLoading, setLocationLoading] = useState(false);
 
   useEffect(() => {
-    const editingPost = JSON.parse(localStorage.getItem("editing_post"));
+    const editingPostRaw = localStorage.getItem("editing_post");
+    if (!editingPostRaw) return;
+
+    const editingPost = JSON.parse(editingPostRaw);
 
     if (editingPost) {
       setEditingId(editingPost.post_id);
@@ -139,7 +132,7 @@ export default function CreatePost() {
         capacity: editingPost.event_capacity || "",
         externalLink: editingPost.external_link || "",
         additionalNotes: editingPost.additional_notes || "",
-        allowPrivateReplies: editingPost.allow_private_replies !== 0
+        allowPrivateReplies: editingPost.allow_private_replies !== 0,
       });
 
       setLocationQuery(editingPost.location_label || editingPost.location || "");
@@ -152,7 +145,7 @@ export default function CreatePost() {
 
     setForm({
       ...form,
-      [name]: value
+      [name]: value,
     });
   }
 
@@ -163,7 +156,7 @@ export default function CreatePost() {
   function formatTime12(timeValue) {
     if (!timeValue) return "Time";
 
-    const [hourRaw, minute] = timeValue.split(":");
+    const [hourRaw, minute = "00"] = timeValue.split(":");
     let hour = Number(hourRaw);
     const ampm = hour >= 12 ? "PM" : "AM";
 
@@ -199,7 +192,7 @@ export default function CreatePost() {
       locationLabel: label,
       latitude: loc.latitude,
       longitude: loc.longitude,
-      locationSource: "search"
+      locationSource: "search",
     });
 
     setLocationQuery(label);
@@ -234,15 +227,9 @@ export default function CreatePost() {
             form.area ||
             "Current area";
 
-          const city =
-            data.active_city ||
-            reverse.city ||
-            form.city;
+          const city = data.active_city || reverse.city || form.city;
 
-          const label =
-            reverse.display_name ||
-            data.location_label ||
-            area;
+          const label = reverse.display_name || data.location_label || area;
 
           setForm({
             ...form,
@@ -252,7 +239,7 @@ export default function CreatePost() {
             locationLabel: label,
             latitude: lat,
             longitude: lng,
-            locationSource: "gps"
+            locationSource: "gps",
           });
 
           setLocationQuery(label);
@@ -337,7 +324,7 @@ export default function CreatePost() {
       event_capacity: form.capacity ? Number(form.capacity) : null,
       external_link: form.externalLink,
       additional_notes: form.additionalNotes,
-      allow_private_replies: form.allowPrivateReplies ? 1 : 0
+      allow_private_replies: form.allowPrivateReplies ? 1 : 0,
     };
 
     try {
@@ -362,421 +349,390 @@ export default function CreatePost() {
   }
 
   return (
-    <div className="home-page">
-      <div className="animated-bg"></div>
+    <div className="cn-page create-post-v2-page">
+      <div className="create-post-shell event-builder-shell">
+        <div className="create-post-left">
+          <div className="create-post-badge">
+            <Sparkles size={18} />
+            Local Pulse
+          </div>
 
-      <Sidebar active="create" />
+          <h2>{editingId ? "Update your post" : "Create a clean local post"}</h2>
 
-      <main className="main-content">
-        <Topbar
-          title={editingId ? "Edit Post" : "Create Post"}
-          subtitle={
-            editingId
-              ? "Update your local post"
-              : "Share something useful with your city"
-          }
-        />
+          <p>
+            Start with the basics. Add extra event details only when needed.
+            This keeps your post simple but still powerful.
+          </p>
 
-        <div className="create-post-shell event-builder-shell">
-          <div className="create-post-left">
-            <div className="create-post-badge">
-              <Sparkles size={18} />
-              Local Pulse
+          <div className="post-preview-mini premium-event-preview">
+            <div className="preview-top-row">
+              <span className="premium-category-chip">
+                {form.category === "Other"
+                  ? form.customCategory || "Other"
+                  : form.category}
+              </span>
+
+              <span className="preview-price-pill">
+                {form.feeType === "Paid" ? `₹${form.priceInr || 0}` : "Free"}
+              </span>
             </div>
 
-            <h2>
-              {editingId ? "Update your post" : "Create a clean local post"}
-            </h2>
+            <h3>{form.title || "Your post title appears here"}</h3>
+
+            <p>{form.description || "Short description preview..."}</p>
+
+            <div>
+              <span>
+                <MapPin size={14} color="white" />
+                {form.area || form.city || "City"}
+              </span>
+
+              <span>
+                <Calendar size={14} color="white" />
+                {form.date || "Date"}
+              </span>
+
+              <span>
+                <Clock3 size={14} color="white" />
+                {formatTime12(form.time)}
+              </span>
+            </div>
+          </div>
+
+          <div className="creator-tips-card">
+            <div>
+              <Eye size={20} color="white" />
+            </div>
+
+            <h3>Preview-first posting</h3>
 
             <p>
-              Start with the basics. Add extra event details only when needed.
-              This keeps your post simple but still powerful.
+              Keep the card short. Put important details in the optional section
+              so the detail view feels like an invitation.
             </p>
-
-            <div className="post-preview-mini premium-event-preview">
-              <div className="preview-top-row">
-                <span className="premium-category-chip">
-                  {form.category === "Other"
-                    ? form.customCategory || "Other"
-                    : form.category}
-                </span>
-
-                <span className="preview-price-pill">
-                  {form.feeType === "Paid"
-                    ? `₹${form.priceInr || 0}`
-                    : "Free"}
-                </span>
-              </div>
-
-              <h3>{form.title || "Your post title appears here"}</h3>
-
-              <p>{form.description || "Short description preview..."}</p>
-
-              <div>
-                <span>
-                  <MapPin size={14} color="white" />
-                  {form.area || form.city || "City"}
-                </span>
-
-                <span>
-                  <Calendar size={14} color="white" />
-                  {form.date || "Date"}
-                </span>
-
-                <span>
-                  <Clock3 size={14} color="white" />
-                  {formatTime12(form.time)}
-                </span>
-              </div>
-            </div>
-
-            <div className="creator-tips-card">
-              <div>
-                <Eye size={20} color="white" />
-              </div>
-
-              <h3>Preview-first posting</h3>
-
-              <p>
-                Keep the card short. Put important details in the optional
-                section so the detail view feels like an invitation.
-              </p>
-            </div>
-          </div>
-
-          <div className="create-post-form-card premium-event-form">
-            <div className="form-section-title">Required Details</div>
-
-            <label>Title *</label>
-            <input
-              name="title"
-              value={form.title}
-              onChange={handleChange}
-              placeholder="Income Tax knowledge sharing event"
-            />
-
-            <small className={titleWordCount() > 25 ? "limit-danger" : ""}>
-              {titleWordCount()} / 25 words
-            </small>
-
-            <label>Short Description</label>
-            <input
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              placeholder="A short line people will see in feed"
-            />
-
-            <div className="form-two-grid">
-              <div>
-                <label>Date *</label>
-                <input
-                  type="date"
-                  name="date"
-                  min={today}
-                  value={form.date}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div>
-                <label>Time *</label>
-                <input
-                  type="time"
-                  name="time"
-                  value={form.time}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
-
-            <div className="form-section-title">Location</div>
-
-            <div className="form-two-grid">
-              <div>
-                <label>City *</label>
-                <select
-                  name="city"
-                  value={form.city}
-                  onChange={handleChange}
-                >
-                  {cities.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label>Area</label>
-                <input
-                  name="area"
-                  value={form.area}
-                  onChange={handleChange}
-                  placeholder="Baner, Kothrud..."
-                />
-              </div>
-            </div>
-
-            <label>Search Location *</label>
-
-            <div className="location-search-row">
-              <input
-                value={locationQuery}
-                onChange={(e) => setLocationQuery(e.target.value)}
-                placeholder="Search locality, venue, landmark..."
-              />
-
-              <button type="button" onClick={handleLocationSearch}>
-                {locationLoading ? "..." : "Find"}
-              </button>
-            </div>
-
-            {locationResults.length > 0 && (
-              <div className="location-results-box">
-                {locationResults.map((loc, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => selectLocation(loc)}
-                  >
-                    <strong>{loc.name || "Location"}</strong>
-                    <span>{loc.address}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="use-location-btn"
-              onClick={useCurrentLocation}
-            >
-              <LocateFixed size={16} color="white" />
-              Use Current Location
-            </button>
-
-            <label>Selected Location *</label>
-            <input
-              name="location"
-              value={form.location}
-              onChange={handleChange}
-              placeholder="Baner, Pune"
-            />
-
-            <button
-              type="button"
-              className="more-details-toggle"
-              onClick={() => setShowMoreDetails(!showMoreDetails)}
-            >
-              {showMoreDetails ? (
-                <>
-                  <ChevronUp size={18} />
-                  Hide optional details
-                </>
-              ) : (
-                <>
-                  <ChevronDown size={18} />
-                  Add more details
-                </>
-              )}
-            </button>
-
-            {showMoreDetails && (
-              <div className="optional-details-panel">
-                <div className="form-section-title">Optional Details</div>
-
-                <div className="form-two-grid">
-                  <div>
-                    <label>Category</label>
-                    <select
-                      name="category"
-                      value={form.category}
-                      onChange={handleChange}
-                    >
-                      {categories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label>Post Type</label>
-                    <select
-                      name="type"
-                      value={form.type}
-                      onChange={handleChange}
-                    >
-                      <option value="community">Community</option>
-                      <option value="workshop">Workshop</option>
-                      <option value="meetup">Meetup</option>
-                      <option value="announcement">Announcement</option>
-                      <option value="sponsored">Sponsored</option>
-                    </select>
-                  </div>
-                </div>
-
-                {form.category === "Other" && (
-                  <>
-                    <label>Custom Category</label>
-                    <input
-                      name="customCategory"
-                      value={form.customCategory}
-                      onChange={handleChange}
-                      placeholder="Board Games, Gardening, Fashion..."
-                    />
-                  </>
-                )}
-
-                <label>Venue</label>
-                <input
-                  name="venue"
-                  value={form.venue}
-                  onChange={handleChange}
-                  placeholder="Community hall, café, society clubhouse..."
-                />
-
-                <div className="form-two-grid">
-                  <div>
-                    <label>Entry Type</label>
-                    <select
-                      name="feeType"
-                      value={form.feeType}
-                      onChange={handleChange}
-                    >
-                      <option value="Free">Free</option>
-                      <option value="Paid">Paid</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label>Capacity</label>
-                    <input
-                      type="number"
-                      name="capacity"
-                      min="1"
-                      value={form.capacity}
-                      onChange={handleChange}
-                      placeholder="50"
-                    />
-                  </div>
-                </div>
-
-                {form.feeType === "Paid" && (
-                  <>
-                    <label>Price in INR</label>
-                    <div className="price-input-box">
-                      <IndianRupee size={16} color="white" />
-                      <input
-                        type="number"
-                        name="priceInr"
-                        min="1"
-                        value={form.priceInr}
-                        onChange={handleChange}
-                        placeholder="199"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <label>Purpose</label>
-                <textarea
-                  name="eventPurpose"
-                  value={form.eventPurpose}
-                  onChange={handleChange}
-                  placeholder="What is this post/event about?"
-                />
-
-                <label>Who Should Join?</label>
-                <textarea
-                  name="whoShouldJoin"
-                  value={form.whoShouldJoin}
-                  onChange={handleChange}
-                  placeholder="Students, professionals, neighbours..."
-                />
-
-                <label>What Will Happen?</label>
-                <textarea
-                  name="whatWillHappen"
-                  value={form.whatWillHappen}
-                  onChange={handleChange}
-                  placeholder="Talk, Q&A, demo, networking..."
-                />
-
-                <label>Detailed Description</label>
-                <textarea
-                  name="detailed"
-                  value={form.detailed}
-                  onChange={handleChange}
-                  placeholder="Explain more..."
-                />
-
-                <label>External Link</label>
-                <div className="price-input-box">
-                  <LinkIcon size={16} color="white" />
-                  <input
-                    name="externalLink"
-                    value={form.externalLink}
-                    onChange={handleChange}
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <label>Additional Notes</label>
-                <textarea
-                  name="additionalNotes"
-                  value={form.additionalNotes}
-                  onChange={handleChange}
-                  placeholder="Parking, instructions, things to bring..."
-                />
-
-                <label className="event-toggle-row">
-                  <input
-                    type="checkbox"
-                    checked={form.allowPrivateReplies}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        allowPrivateReplies: e.target.checked
-                      })
-                    }
-                  />
-
-                  <span>
-                    <Users size={16} color="white" />
-                    Allow private replies
-                  </span>
-                </label>
-              </div>
-            )}
-
-            <div className="create-post-actions">
-              <button className="save-btn" onClick={publishPost}>
-                <Send size={17} color="white" />
-                {loading
-                  ? "Saving..."
-                  : editingId
-                  ? "Update Post"
-                  : "Publish Post"}
-              </button>
-
-              <button
-                className="secondary-btn"
-                onClick={() => {
-                  localStorage.removeItem("editing_post");
-                  navigate("/my-posts");
-                }}
-              >
-                <X size={17} color="white" />
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
-      </main>
+
+        <div className="create-post-form-card premium-event-form">
+          <div className="form-section-title">Required Details</div>
+
+          <label>Title *</label>
+          <input
+            name="title"
+            value={form.title}
+            onChange={handleChange}
+            placeholder="Income Tax knowledge sharing event"
+          />
+
+          <small className={titleWordCount() > 25 ? "limit-danger" : ""}>
+            {titleWordCount()} / 25 words
+          </small>
+
+          <label>Short Description</label>
+          <input
+            name="description"
+            value={form.description}
+            onChange={handleChange}
+            placeholder="A short line people will see in feed"
+          />
+
+          <div className="form-two-grid">
+            <div>
+              <label>Date *</label>
+              <input
+                type="date"
+                name="date"
+                min={today}
+                value={form.date}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div>
+              <label>Time *</label>
+              <input
+                type="time"
+                name="time"
+                value={form.time}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-section-title">Location</div>
+
+          <div className="form-two-grid">
+            <div>
+              <label>City *</label>
+              <select name="city" value={form.city} onChange={handleChange}>
+                {cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label>Area</label>
+              <input
+                name="area"
+                value={form.area}
+                onChange={handleChange}
+                placeholder="Baner, Kothrud..."
+              />
+            </div>
+          </div>
+
+          <label>Search Location *</label>
+
+          <div className="location-search-row">
+            <input
+              value={locationQuery}
+              onChange={(e) => setLocationQuery(e.target.value)}
+              placeholder="Search locality, venue, landmark..."
+            />
+
+            <button type="button" onClick={handleLocationSearch}>
+              {locationLoading ? "..." : "Find"}
+            </button>
+          </div>
+
+          {locationResults.length > 0 && (
+            <div className="location-results-box">
+              {locationResults.map((loc, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => selectLocation(loc)}
+                >
+                  <strong>{loc.name || "Location"}</strong>
+                  <span>{loc.address}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="use-location-btn"
+            onClick={useCurrentLocation}
+          >
+            <LocateFixed size={16} color="white" />
+            Use Current Location
+          </button>
+
+          <label>Selected Location *</label>
+          <input
+            name="location"
+            value={form.location}
+            onChange={handleChange}
+            placeholder="Baner, Pune"
+          />
+
+          <button
+            type="button"
+            className="more-details-toggle"
+            onClick={() => setShowMoreDetails(!showMoreDetails)}
+          >
+            {showMoreDetails ? (
+              <>
+                <ChevronUp size={18} />
+                Hide optional details
+              </>
+            ) : (
+              <>
+                <ChevronDown size={18} />
+                Add more details
+              </>
+            )}
+          </button>
+
+          {showMoreDetails && (
+            <div className="optional-details-panel">
+              <div className="form-section-title">Optional Details</div>
+
+              <div className="form-two-grid">
+                <div>
+                  <label>Category</label>
+                  <select
+                    name="category"
+                    value={form.category}
+                    onChange={handleChange}
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label>Post Type</label>
+                  <select name="type" value={form.type} onChange={handleChange}>
+                    <option value="community">Community</option>
+                    <option value="workshop">Workshop</option>
+                    <option value="meetup">Meetup</option>
+                    <option value="announcement">Announcement</option>
+                    <option value="sponsored">Sponsored</option>
+                  </select>
+                </div>
+              </div>
+
+              {form.category === "Other" && (
+                <>
+                  <label>Custom Category</label>
+                  <input
+                    name="customCategory"
+                    value={form.customCategory}
+                    onChange={handleChange}
+                    placeholder="Board Games, Gardening, Fashion..."
+                  />
+                </>
+              )}
+
+              <label>Venue</label>
+              <input
+                name="venue"
+                value={form.venue}
+                onChange={handleChange}
+                placeholder="Community hall, café, society clubhouse..."
+              />
+
+              <div className="form-two-grid">
+                <div>
+                  <label>Entry Type</label>
+                  <select
+                    name="feeType"
+                    value={form.feeType}
+                    onChange={handleChange}
+                  >
+                    <option value="Free">Free</option>
+                    <option value="Paid">Paid</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label>Capacity</label>
+                  <input
+                    type="number"
+                    name="capacity"
+                    min="1"
+                    value={form.capacity}
+                    onChange={handleChange}
+                    placeholder="50"
+                  />
+                </div>
+              </div>
+
+              {form.feeType === "Paid" && (
+                <>
+                  <label>Price in INR</label>
+                  <div className="price-input-box">
+                    <IndianRupee size={16} color="white" />
+                    <input
+                      type="number"
+                      name="priceInr"
+                      min="1"
+                      value={form.priceInr}
+                      onChange={handleChange}
+                      placeholder="199"
+                    />
+                  </div>
+                </>
+              )}
+
+              <label>Purpose</label>
+              <textarea
+                name="eventPurpose"
+                value={form.eventPurpose}
+                onChange={handleChange}
+                placeholder="What is this post/event about?"
+              />
+
+              <label>Who Should Join?</label>
+              <textarea
+                name="whoShouldJoin"
+                value={form.whoShouldJoin}
+                onChange={handleChange}
+                placeholder="Students, professionals, neighbours..."
+              />
+
+              <label>What Will Happen?</label>
+              <textarea
+                name="whatWillHappen"
+                value={form.whatWillHappen}
+                onChange={handleChange}
+                placeholder="Talk, Q&A, demo, networking..."
+              />
+
+              <label>Detailed Description</label>
+              <textarea
+                name="detailed"
+                value={form.detailed}
+                onChange={handleChange}
+                placeholder="Explain more..."
+              />
+
+              <label>External Link</label>
+              <div className="price-input-box">
+                <LinkIcon size={16} color="white" />
+                <input
+                  name="externalLink"
+                  value={form.externalLink}
+                  onChange={handleChange}
+                  placeholder="https://..."
+                />
+              </div>
+
+              <label>Additional Notes</label>
+              <textarea
+                name="additionalNotes"
+                value={form.additionalNotes}
+                onChange={handleChange}
+                placeholder="Parking, instructions, things to bring..."
+              />
+
+              <label className="event-toggle-row">
+                <input
+                  type="checkbox"
+                  checked={form.allowPrivateReplies}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      allowPrivateReplies: e.target.checked,
+                    })
+                  }
+                />
+
+                <span>
+                  <Users size={16} color="white" />
+                  Allow private replies
+                </span>
+              </label>
+            </div>
+          )}
+
+          <div className="create-post-actions">
+            <button className="save-btn" onClick={publishPost} disabled={loading}>
+              <Send size={17} color="white" />
+              {loading ? "Saving..." : editingId ? "Update Post" : "Publish Post"}
+            </button>
+
+            <button
+              className="secondary-btn"
+              onClick={() => {
+                localStorage.removeItem("editing_post");
+                navigate("/my-posts");
+              }}
+            >
+              <X size={17} color="white" />
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

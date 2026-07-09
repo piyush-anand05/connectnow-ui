@@ -1,176 +1,135 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import {
   Bell,
-  UserCircle2,
-  User,
-  Settings,
+  Bookmark,
+  ChevronDown,
   LogOut,
-  CheckCheck
+  MapPinned,
+  Newspaper,
+  Settings,
+  UserRound,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
-import {
-  getMyNotifications,
-  getUnreadNotificationCount,
-  markAllNotificationsRead,
-  markNotificationRead
-} from "../api/notifications";
+function getInitials(nameOrEmail) {
+  if (!nameOrEmail) return "CW";
+  const text = String(nameOrEmail).trim();
+  if (!text) return "CW";
+  const parts = text.split(" ").filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return text.slice(0, 2).toUpperCase();
+}
 
-export default function Topbar({ title, subtitle }) {
+function Topbar({ title = "Local Pulse", subtitle = "Fresh local signals around your active city" }) {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
-  const [open, setOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
+  const displayName = user?.name || user?.full_name || user?.username || user?.email || "Local explorer";
+  const initials = getInitials(displayName);
+  const activeCity = user?.active_city || user?.city || localStorage.getItem("active_city") || "Set city";
 
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const accountActions = useMemo(
+    () => [
+      { label: "View Profile", path: "/profile", icon: UserRound },
+      { label: "My Posts", path: "/my-posts", icon: Newspaper },
+      { label: "Saved Posts", path: "/saved-posts", icon: Bookmark },
+      { label: "Account Settings", path: "/settings", icon: Settings },
+    ],
+    []
+  );
 
   useEffect(() => {
-    loadNotifications();
-
-    const interval = setInterval(loadNotifications, 8000);
-
-    return () => clearInterval(interval);
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setAccountOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  function logout() {
-    localStorage.clear();
-    navigate("/");
-  }
-
-  function formatTime(dateString) {
-    if (!dateString) return "";
-
-    return new Date(dateString).toLocaleString([], {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  }
-
-  async function loadNotifications() {
-    try {
-      const [list, countData] = await Promise.all([
-        getMyNotifications(),
-        getUnreadNotificationCount()
-      ]);
-
-      setNotifications(list);
-      setUnreadCount(countData.unread_count || 0);
-    } catch {
-      setNotifications([]);
-      setUnreadCount(0);
-    }
-  }
-
-  async function handleMarkAllRead() {
-    try {
-      await markAllNotificationsRead();
-      await loadNotifications();
-    } catch (err) {
-      console.log(err);
-    }
-  }
-
-  async function handleNotificationClick(notification) {
-    try {
-      if (!notification.is_read) {
-        await markNotificationRead(notification.notification_id);
-      }
-
-      await loadNotifications();
-
-      if (notification.notification_type === "connection_request") {
-        navigate("/network");
-      } else if (notification.notification_type === "connection_accepted") {
-        navigate("/network");
-      } else if (notification.notification_type === "message") {
-        navigate("/messages");
-      }
-    } catch (err) {
-      console.log(err);
-    }
+  function handleLogout() {
+    logout();
+    navigate("/login", { replace: true });
   }
 
   return (
-    <div className="topbar">
-      <div>
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
+    <header className="cn-topbar cn-topbar-living">
+      <div className="cn-topbar-left">
+        <div className="cn-topbar-title-block">
+          <h2 className="cn-topbar-title text-one-line">{title}</h2>
+          <p className="cn-topbar-subtitle text-one-line">{subtitle}</p>
+        </div>
       </div>
 
-      <div className="top-icons">
-        <div className="notification-area">
-          <button
-            className="icon-btn notif-icon-btn"
-            onClick={() => setNotifOpen(!notifOpen)}
-          >
-            <Bell size={22} />
+      <div className="cn-topbar-right">
+        <button
+          type="button"
+          className="cn-location-pill cn-location-pill-living"
+          onClick={() => navigate("/settings")}
+          title="Update active city"
+        >
+          <MapPinned size={16} />
+          <span>{activeCity}</span>
+        </button>
 
-            {unreadCount > 0 && (
-              <span className="notif-badge">{unreadCount}</span>
-            )}
+        <button
+          type="button"
+          className="cn-icon-btn cn-topbar-bell"
+          onClick={() => navigate("/notifications")}
+          title="Notifications"
+          aria-label="Notifications"
+        >
+          <Bell size={18} />
+          <span className="cn-topbar-bell-dot" />
+        </button>
+
+        <div className="cn-account-menu" ref={dropdownRef}>
+          <button
+            type="button"
+            className="cn-profile-pill cn-profile-pill-living"
+            onClick={() => setAccountOpen((value) => !value)}
+            title="Open account menu"
+            aria-label="Open account menu"
+          >
+            <span className="cn-profile-avatar">{initials}</span>
+            <span className="cn-profile-name">{displayName}</span>
+            <ChevronDown size={15} className={accountOpen ? "cn-account-chevron-open" : ""} />
           </button>
 
-          {notifOpen && (
-            <div className="notification-dropdown">
-              <div className="notification-head">
-                <h3>Notifications</h3>
-
-                <button onClick={handleMarkAllRead}>
-                  <CheckCheck size={15} />
-                  Mark all read
-                </button>
+          {accountOpen && (
+            <div className="cn-account-dropdown">
+              <div className="cn-account-dropdown-head">
+                <span className="cn-profile-avatar cn-account-dropdown-avatar">{initials}</span>
+                <div>
+                  <strong>{displayName}</strong>
+                  <small>{user?.email || "Your local identity"}</small>
+                </div>
               </div>
 
-              {notifications.length === 0 ? (
-                <div className="notification-empty">
-                  No notifications yet.
-                </div>
-              ) : (
-                notifications.slice(0, 8).map((notif) => (
-                  <button
-                    key={notif.notification_id}
-                    className={
-                      notif.is_read
-                        ? "notification-item"
-                        : "notification-item unread"
-                    }
-                    onClick={() => handleNotificationClick(notif)}
-                  >
-                    <strong>{notif.title}</strong>
-                    <p>{notif.message}</p>
-                    <span>{formatTime(notif.created_dt)}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
+              <div className="cn-account-dropdown-actions">
+                {accountActions.map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <button
+                      key={action.path}
+                      type="button"
+                      onClick={() => {
+                        setAccountOpen(false);
+                        navigate(action.path);
+                      }}
+                    >
+                      <Icon size={16} />
+                      {action.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-        <div className="profile-area">
-          <button
-            className="icon-btn"
-            onClick={() => setOpen(!open)}
-          >
-            <UserCircle2 size={28} />
-          </button>
-
-          {open && (
-            <div className="profile-dropdown">
-              <button onClick={() => navigate("/profile")}>
-                <User size={16} />
-                My Profile
-              </button>
-
-              <button onClick={() => navigate("/settings")}>
-                <Settings size={16} />
-                Account Settings
-              </button>
-
-              <button onClick={logout}>
+              <button type="button" className="cn-account-logout" onClick={handleLogout}>
                 <LogOut size={16} />
                 Logout
               </button>
@@ -178,6 +137,8 @@ export default function Topbar({ title, subtitle }) {
           )}
         </div>
       </div>
-    </div>
+    </header>
   );
 }
+
+export default Topbar;

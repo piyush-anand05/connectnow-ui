@@ -11,9 +11,6 @@ import {
   ShieldOff
 } from "lucide-react";
 
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-
 import {
   markOnline,
   markOffline,
@@ -200,252 +197,241 @@ export default function Messages() {
   }, [conversations, search]);
 
   return (
-    <div className="home-page">
-      <div className="animated-bg"></div>
+    <div className="cn-page messages-v2-page">
+      {notice && (
+        <div className="success-box" style={{ marginBottom: "20px" }}>
+          ✅ {notice}
+        </div>
+      )}
 
-      <Sidebar active="messages" />
+      {error && (
+        <div className="error-box" style={{ marginBottom: "20px" }}>
+          ❌ {error}
+        </div>
+      )}
 
-      <main className="main-content">
-        <Topbar
-          title="Messages"
-          subtitle="Chat with your accepted local connections"
-        />
+      <div className="messages-layout">
+        <aside className="conversation-panel">
+          <div className="conversation-search">
+            <Search size={18} />
 
-        {notice && (
-          <div className="success-box" style={{ marginBottom: "20px" }}>
-            ✅ {notice}
+            <input
+              placeholder="Search chats..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-        )}
 
-        {error && (
-          <div className="error-box" style={{ marginBottom: "20px" }}>
-            ❌ {error}
-          </div>
-        )}
-
-        <div className="messages-layout">
-          <aside className="conversation-panel">
-            <div className="conversation-search">
-              <Search size={18} />
-
-              <input
-                placeholder="Search chats..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+          {filteredConversations.length === 0 ? (
+            <div className="empty-chat">
+              <MessageCircle size={34} />
+              <p>No conversations yet.</p>
             </div>
-
-            {filteredConversations.length === 0 ? (
-              <div className="empty-chat">
-                <MessageCircle size={34} />
-                <p>No conversations yet.</p>
-              </div>
-            ) : (
-              filteredConversations.map((conv) => (
-                <button
-                  key={conv.conversation_id}
-                  className={
-                    activeConv?.conversation_id === conv.conversation_id
-                      ? "conversation-item active-conversation"
-                      : "conversation-item"
-                  }
-                  onClick={() => setActiveConv(conv)}
-                >
-                  <div className="conversation-avatar">
-                    {conv.participant?.name?.charAt(0) || "U"}
-                  </div>
-
-                  <div className="conversation-info">
-                    <div className="conversation-name-row">
-                      <h3>{conv.participant?.name}</h3>
-
-                      <span
-                        className={
-                          conv.participant?.is_online
-                            ? "online-dot"
-                            : "offline-dot"
-                        }
-                      />
-                    </div>
-
-                    <p>{conv.last_message || "No messages yet"}</p>
-
-                    {conv.last_message_at && (
-                      <small>
-                        {formatDateLabel(conv.last_message_at)} ·{" "}
-                        {formatTime(conv.last_message_at)}
-                      </small>
-                    )}
-                  </div>
-
-                  {conv.unread_count > 0 && (
-                    <span className="unread-badge">
-                      {conv.unread_count}
-                    </span>
-                  )}
-                </button>
-              ))
-            )}
-          </aside>
-
-          <section className="chat-panel">
-            {!activeConv ? (
-              <div className="empty-chat large">
-                <MessageCircle size={42} />
-                <h2>Select a conversation</h2>
-                <p>You can message only accepted connections.</p>
-              </div>
-            ) : (
-              <>
-                <div className="chat-header">
-                  <div className="chat-user">
-                    <div className="conversation-avatar big">
-                      {activeConv.participant?.name?.charAt(0)}
-                    </div>
-
-                    <div>
-                      <h2>{activeConv.participant?.name}</h2>
-
-                      <p>
-                        <Circle
-                          size={10}
-                          fill={
-                            activeConv.participant?.is_online
-                              ? "#B8FF4F"
-                              : "#ef4444"
-                          }
-                          color={
-                            activeConv.participant?.is_online
-                              ? "#B8FF4F"
-                              : "#ef4444"
-                          }
-                        />
-
-                        {activeConv.participant?.is_online
-                          ? "Online"
-                          : activeConv.participant?.last_seen_at
-                          ? `Last seen ${formatDateLabel(
-                              activeConv.participant.last_seen_at
-                            )} ${formatTime(
-                              activeConv.participant.last_seen_at
-                            )}`
-                          : "Offline"}
-                      </p>
-                    </div>
-                  </div>
+          ) : (
+            filteredConversations.map((conv) => (
+              <button
+                key={conv.conversation_id}
+                className={
+                  activeConv?.conversation_id === conv.conversation_id
+                    ? "conversation-item active-conversation"
+                    : "conversation-item"
+                }
+                onClick={() => setActiveConv(conv)}
+              >
+                <div className="conversation-avatar">
+                  {conv.participant?.name?.charAt(0) || "U"}
                 </div>
 
-                <div className="message-list">
-                  {messages.map((msg, index) => {
-                    const mine =
-                      msg.sender_user_id === currentUser.unique_user_id;
+                <div className="conversation-info">
+                  <div className="conversation-name-row">
+                    <h3>{conv.participant?.name}</h3>
 
-                    return (
-                      <div key={msg.message_id}>
-                        {shouldShowDate(index) && (
-                          <div className="date-separator">
-                            <span>{formatDateLabel(msg.created_at)}</span>
-                          </div>
-                        )}
+                    <span
+                      className={
+                        conv.participant?.is_online
+                          ? "online-dot"
+                          : "offline-dot"
+                      }
+                    />
+                  </div>
 
-                        <div className={mine ? "msg-row mine" : "msg-row"}>
-                          <div
-                            className={
-                              mine ? "msg-bubble mine" : "msg-bubble"
-                            }
-                          >
-                            <p>{msg.message_text}</p>
+                  <p>{conv.last_message || "No messages yet"}</p>
 
-                            <div className="msg-meta">
-                              <span>{formatTime(msg.created_at)}</span>
+                  {conv.last_message_at && (
+                    <small>
+                      {formatDateLabel(conv.last_message_at)} ·{" "}
+                      {formatTime(conv.last_message_at)}
+                    </small>
+                  )}
+                </div>
 
-                              {mine && (
-                                <span className="tick">
-                                  {msg.is_read ? (
-                                    <CheckCheck size={15} />
-                                  ) : (
-                                    <Check size={15} />
-                                  )}
-                                </span>
-                              )}
-                            </div>
+                {conv.unread_count > 0 && (
+                  <span className="unread-badge">
+                    {conv.unread_count}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </aside>
+
+        <section className="chat-panel">
+          {!activeConv ? (
+            <div className="empty-chat large">
+              <MessageCircle size={42} />
+              <h2>Select a conversation</h2>
+              <p>You can message only accepted connections.</p>
+            </div>
+          ) : (
+            <>
+              <div className="chat-header">
+                <div className="chat-user">
+                  <div className="conversation-avatar big">
+                    {activeConv.participant?.name?.charAt(0)}
+                  </div>
+
+                  <div>
+                    <h2>{activeConv.participant?.name}</h2>
+
+                    <p>
+                      <Circle
+                        size={10}
+                        fill={
+                          activeConv.participant?.is_online
+                            ? "#B8FF4F"
+                            : "#ef4444"
+                        }
+                        color={
+                          activeConv.participant?.is_online
+                            ? "#B8FF4F"
+                            : "#ef4444"
+                        }
+                      />
+
+                      {activeConv.participant?.is_online
+                        ? "Online"
+                        : activeConv.participant?.last_seen_at
+                        ? `Last seen ${formatDateLabel(
+                            activeConv.participant.last_seen_at
+                          )} ${formatTime(
+                            activeConv.participant.last_seen_at
+                          )}`
+                        : "Offline"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="message-list">
+                {messages.map((msg, index) => {
+                  const mine =
+                    msg.sender_user_id === currentUser.unique_user_id;
+
+                  return (
+                    <div key={msg.message_id}>
+                      {shouldShowDate(index) && (
+                        <div className="date-separator">
+                          <span>{formatDateLabel(msg.created_at)}</span>
+                        </div>
+                      )}
+
+                      <div className={mine ? "msg-row mine" : "msg-row"}>
+                        <div
+                          className={
+                            mine ? "msg-bubble mine" : "msg-bubble"
+                          }
+                        >
+                          <p>{msg.message_text}</p>
+
+                          <div className="msg-meta">
+                            <span>{formatTime(msg.created_at)}</span>
+
+                            {mine && (
+                              <span className="tick">
+                                {msg.is_read ? (
+                                  <CheckCheck size={15} />
+                                ) : (
+                                  <Check size={15} />
+                                )}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  );
+                })}
 
-                  <div ref={bottomRef}></div>
-                </div>
+                <div ref={bottomRef}></div>
+              </div>
 
-                <div className="chat-input">
-                  <input
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleSend();
-                      }
-                    }}
-                    placeholder="Write a message..."
-                  />
+              <div className="chat-input">
+                <input
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Write a message..."
+                />
 
-                  <button onClick={handleSend}>
-                    <Send size={18} />
-                  </button>
-                </div>
-              </>
-            )}
-          </section>
-
-          <aside className="message-context">
-            {activeConv ? (
-              <>
-                <UserCircle2 size={58} />
-
-                <h3>{activeConv.participant?.name}</h3>
-
-                <p>{activeConv.participant?.city}</p>
-
-                <div className="context-box">
-                  <span>Can help with</span>
-
-                  <p>
-                    {activeConv.participant?.can_help_with ||
-                      "Not added yet"}
-                  </p>
-                </div>
-
-                <div className="context-box">
-                  <span>Status</span>
-
-                  <p>
-                    {activeConv.participant?.is_online
-                      ? "Online now"
-                      : activeConv.participant?.last_seen_at
-                      ? `Last seen ${formatDateLabel(
-                          activeConv.participant.last_seen_at
-                        )} at ${formatTime(
-                          activeConv.participant.last_seen_at
-                        )}`
-                      : "Offline"}
-                  </p>
-                </div>
-
-                <button
-                  className="block-user-btn"
-                  onClick={handleBlockUser}
-                >
-                  <ShieldOff size={16} />
-                  Block User
+                <button onClick={handleSend}>
+                  <Send size={18} />
                 </button>
-              </>
-            ) : (
-              <p>Select a chat to see context.</p>
-            )}
-          </aside>
-        </div>
-      </main>
+              </div>
+            </>
+          )}
+        </section>
+
+        <aside className="message-context">
+          {activeConv ? (
+            <>
+              <UserCircle2 size={58} />
+
+              <h3>{activeConv.participant?.name}</h3>
+
+              <p>{activeConv.participant?.city}</p>
+
+              <div className="context-box">
+                <span>Can help with</span>
+
+                <p>
+                  {activeConv.participant?.can_help_with ||
+                    "Not added yet"}
+                </p>
+              </div>
+
+              <div className="context-box">
+                <span>Status</span>
+
+                <p>
+                  {activeConv.participant?.is_online
+                    ? "Online now"
+                    : activeConv.participant?.last_seen_at
+                    ? `Last seen ${formatDateLabel(
+                        activeConv.participant.last_seen_at
+                      )} at ${formatTime(
+                        activeConv.participant.last_seen_at
+                      )}`
+                    : "Offline"}
+                </p>
+              </div>
+
+              <button
+                className="block-user-btn"
+                onClick={handleBlockUser}
+              >
+                <ShieldOff size={16} />
+                Block User
+              </button>
+            </>
+          ) : (
+            <p>Select a chat to see context.</p>
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

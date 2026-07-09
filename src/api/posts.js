@@ -19,6 +19,10 @@ export function getMyPosts() {
   return apiRequest("/posts/me");
 }
 
+export function getSavedPosts() {
+  return apiRequest("/posts/saved");
+}
+
 export function getPost(postId) {
   return apiRequest(`/posts/${postId}`);
 }
@@ -53,14 +57,26 @@ export function unlikePost(postId) {
 }
 
 //
-// REPORT POST
+// SAVES
 //
 
-export function reportPost(
-  postId,
-  reason,
-  otherReason = ""
-) {
+export function savePost(postId) {
+  return apiRequest(`/posts/${postId}/save`, {
+    method: "POST"
+  });
+}
+
+export function unsavePost(postId) {
+  return apiRequest(`/posts/${postId}/save`, {
+    method: "DELETE"
+  });
+}
+
+//
+// REPORT
+//
+
+export function reportPost(postId, reason, otherReason = "") {
   return apiRequest(`/posts/${postId}/report`, {
     method: "POST",
     body: JSON.stringify({

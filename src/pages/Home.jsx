@@ -1,65 +1,96 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
-import {
-  Sparkles,
-  MapPin,
-  Clock,
-  Search,
-  X,
-  ArrowRight,
-  Heart,
-  Flag,
-  MessageCircle,
-  CalendarDays,
-  Send
-} from "lucide-react";
-
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
+import { Sparkles } from "lucide-react";
 
 import {
   getPosts,
   likePost,
   unlikePost,
-  reportPost
+  savePost,
+  unsavePost,
+  reportPost,
 } from "../api/posts";
 
 import { startPostChat } from "../api/postChat";
+import { saveUserLocation } from "../api/location";
+
+import HomeHero from "../components/home/HomeHero";
+import AISearchCard from "../components/home/AISearchCard";
+import HomeFilters from "../components/home/HomeFilters";
+import DiscoveryChips from "../components/home/DiscoveryChips";
+import PostCard from "../components/feed/PostCard";
+import PostDetailModal from "../components/feed/PostDetailModal";
+import ReplyModal from "../components/feed/ReplyModal";
+import ReportModal from "../components/feed/ReportModal";
+
+import {
+  isToday,
+  isTomorrow,
+  isThisWeek,
+} from "../components/feed/postUtils";
 
 import "../styles/home.css";
 
-export default function Home() {
-  const savedUser =
-    JSON.parse(localStorage.getItem("user")) || {
-      name: "Amit",
-      city: "Pune"
+const categories = [
+  "All",
+  "Technology",
+  "Education",
+  "Sports",
+  "Business",
+  "Health",
+  "Food",
+  "Events",
+  "Community",
+  "Arts",
+  "Other",
+];
+
+const aiPrompts = [
+  "Need a tutor nearby?",
+  "Looking for homemade food?",
+  "Need laptop repair?",
+  "Want badminton partners?",
+  "Need a blood donor?",
+  "Looking for a weekend event?",
+  "Need someone to water plants?",
+  "Want spoken English practice?",
+  "Need a CA nearby?",
+  "Looking for a guitar teacher?",
+];
+
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem("user");
+    if (!raw) {
+      return {
+        name: "Local explorer",
+        city: "Pune",
+        active_city: "Pune",
+      };
+    }
+
+    return JSON.parse(raw);
+  } catch {
+    return {
+      name: "Local explorer",
+      city: "Pune",
+      active_city: "Pune",
     };
+  }
+}
 
-  const categories = [
-    "All",
-    "Technology",
-    "Education",
-    "Sports",
-    "Business",
-    "Health",
-    "Food",
-    "Events",
-    "Community",
-    "Arts",
-    "Other"
-  ];
-
-  const aiPrompts = [
-    "Need help filing insurance claim?",
-    "Looking for a wedding photographer?",
-    "Need a Python mentor nearby?",
-    "Looking for startup co-founder?",
-    "Need CA recommendation?",
-    "Want to join a cricket group?"
-  ];
+export default function Home() {
+  const savedUser = getStoredUser();
 
   const [posts, setPosts] = useState([]);
+
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [dateFilter, setDateFilter] = useState("All");
+  const [feeFilter, setFeeFilter] = useState("All");
+  const [search, setSearch] = useState("");
+
+  const [visibleCount, setVisibleCount] = useState(16);
+
   const [selectedPost, setSelectedPost] = useState(null);
   const [reportingPost, setReportingPost] = useState(null);
   const [replyPost, setReplyPost] = useState(null);
@@ -70,6 +101,7 @@ export default function Home() {
 
   const [promptIndex, setPromptIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -86,70 +118,148 @@ export default function Home() {
     try {
       setLoading(true);
       const data = await getPosts();
-      setPosts(data);
+      setPosts(Array.isArray(data) ? data : []);
     } catch (err) {
       console.log(err);
+      setMessage("Unable to load posts.");
     } finally {
       setLoading(false);
     }
   }
 
-  function getDayName(dateString) {
-    if (!dateString) return "Day not added";
+  function showMessage(text) {
+    setMessage(text);
 
-    return new Date(dateString).toLocaleDateString("en-US", {
-      weekday: "long"
-    });
+    setTimeout(() => {
+      setMessage("");
+    }, 2500);
   }
 
-  function formatDate(dateString) {
-    if (!dateString) return "Date not added";
+  async function activateLocalRadar() {
+    if (!navigator.geolocation) {
+      showMessage("Location is not supported in this browser.");
+      return;
+    }
 
-    return new Date(dateString).toLocaleDateString("en-US", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric"
-    });
+    setLocating(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+
+          const result = await saveUserLocation(lat, lng);
+
+          const user = getStoredUser();
+
+          localStorage.setItem(
+            "user",
+            JSON.stringify({
+              ...user,
+              latitude: lat,
+              longitude: lng,
+              active_city:
+                result?.data?.active_city || user.active_city || user.city,
+              city: result?.data?.active_city || user.city,
+              location_label: result?.data?.location_label,
+            })
+          );
+
+          await loadPosts();
+
+          showMessage("Local Radar activated. Showing nearby posts first.");
+        } catch (err) {
+          console.log(err);
+          showMessage("Unable to save location.");
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => {
+        setLocating(false);
+        showMessage("Location permission denied.");
+      }
+    );
   }
 
   async function handleLike(post) {
     try {
-      let result;
+      const result = post.is_liked_by_me
+        ? await unlikePost(post.post_id)
+        : await likePost(post.post_id);
 
-      if (post.is_liked_by_me) {
-        result = await unlikePost(post.post_id);
-      } else {
-        result = await likePost(post.post_id);
-      }
+      updatePostState(post.post_id, {
+        like_count: result.like_count,
+        is_liked_by_me: result.is_liked_by_me,
+      });
+    } catch (err) {
+      console.log(err);
+      showMessage("Unable to update like.");
+    }
+  }
 
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.post_id === post.post_id
-            ? {
-                ...p,
-                like_count: result.like_count,
-                is_liked_by_me: result.is_liked_by_me
-              }
-            : p
-        )
-      );
+  async function handleSave(post) {
+    try {
+      const result = post.is_saved_by_me
+        ? await unsavePost(post.post_id)
+        : await savePost(post.post_id);
 
-      if (selectedPost?.post_id === post.post_id) {
-        setSelectedPost({
-          ...selectedPost,
-          like_count: result.like_count,
-          is_liked_by_me: result.is_liked_by_me
+      updatePostState(post.post_id, {
+        save_count: result.save_count,
+        is_saved_by_me: result.is_saved_by_me,
+      });
+
+      showMessage(result.is_saved_by_me ? "Saved." : "Removed from saved.");
+    } catch (err) {
+      console.log(err);
+      showMessage("Unable to update saved post.");
+    }
+  }
+
+  function updatePostState(postId, changes) {
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.post_id === postId
+          ? {
+              ...post,
+              ...changes,
+            }
+          : post
+      )
+    );
+
+    if (selectedPost?.post_id === postId) {
+      setSelectedPost({
+        ...selectedPost,
+        ...changes,
+      });
+    }
+  }
+
+  async function handleShare(post) {
+    const shareText = `${post.title} - ${post.location || ""}`;
+    const shareUrl = `${window.location.origin}/home?post=${post.post_id}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: post.title,
+          text: shareText,
+          url: shareUrl,
         });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        showMessage("Post link copied.");
       }
     } catch (err) {
       console.log(err);
-      setMessage("Unable to update like.");
     }
   }
 
   function openPrivateReply(post) {
     if (!post.allow_private_replies) {
-      setMessage("Private replies are disabled for this post.");
+      showMessage("Private replies are disabled for this post.");
       return;
     }
 
@@ -162,7 +272,12 @@ export default function Home() {
       if (!replyPost) return;
 
       if (!replyText.trim()) {
-        setMessage("Please write a message first.");
+        showMessage("Please write a message first.");
+        return;
+      }
+
+      if (replyText.trim().length > 250) {
+        showMessage("Private reply must be within 250 characters.");
         return;
       }
 
@@ -171,14 +286,10 @@ export default function Home() {
       setReplyPost(null);
       setReplyText("");
 
-      setMessage("Private reply sent successfully.");
-
-      setTimeout(() => {
-        setMessage("");
-      }, 2500);
+      showMessage("Private reply sent successfully.");
     } catch (err) {
       console.log(err);
-      setMessage("Unable to send private reply.");
+      showMessage("Unable to send private reply.");
     }
   }
 
@@ -190,12 +301,12 @@ export default function Home() {
         const wordCount = otherReason.trim().split(/\s+/).filter(Boolean).length;
 
         if (wordCount === 0) {
-          setMessage("Please specify the reason.");
+          showMessage("Please specify the reason.");
           return;
         }
 
         if (wordCount > 15) {
-          setMessage("Other reason must be within 15 words.");
+          showMessage("Other reason must be within 15 words.");
           return;
         }
       }
@@ -206,332 +317,211 @@ export default function Home() {
       setReportReason("Abuse");
       setOtherReason("");
 
-      setMessage("Post reported successfully.");
-
-      setTimeout(() => {
-        setMessage("");
-      }, 2500);
+      showMessage("Post reported successfully.");
     } catch (err) {
       console.log(err);
-      setMessage("Unable to report post or already reported.");
+      showMessage("Unable to report post or already reported.");
     }
   }
 
-  const filteredPosts =
-    selectedCategory === "All"
-      ? posts
-      : posts.filter((post) => post.category === selectedCategory);
+  function handleCategoryChange(value) {
+    setSelectedCategory(value);
+    setVisibleCount(16);
+  }
+
+  function handleDateFilterChange(value) {
+    setDateFilter(value);
+    setVisibleCount(16);
+  }
+
+  function handleFeeFilterChange(value) {
+    setFeeFilter(value);
+    setVisibleCount(16);
+  }
+
+  const filteredPosts = useMemo(() => {
+    let list = [...posts];
+
+    if (selectedCategory !== "All") {
+      list = list.filter((post) => post.category === selectedCategory);
+    }
+
+    if (dateFilter === "Today") {
+      list = list.filter((post) => isToday(post.event_date));
+    }
+
+    if (dateFilter === "Tomorrow") {
+      list = list.filter((post) => isTomorrow(post.event_date));
+    }
+
+    if (dateFilter === "This Week") {
+      list = list.filter((post) => isThisWeek(post.event_date));
+    }
+
+    if (feeFilter !== "All") {
+      list = list.filter((post) => post.event_fee_type === feeFilter);
+    }
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+
+      list = list.filter((post) => {
+        const block = `
+          ${post.title || ""}
+          ${post.short_description || ""}
+          ${post.category || ""}
+          ${post.custom_category || ""}
+          ${post.location || ""}
+          ${post.area || ""}
+          ${post.city || ""}
+          ${post.event_purpose || ""}
+          ${post.who_should_join || ""}
+          ${post.what_will_happen || ""}
+        `.toLowerCase();
+
+        return block.includes(q);
+      });
+    }
+
+    list.sort((a, b) => {
+      const da = a.distance_km ?? 999999;
+      const db = b.distance_km ?? 999999;
+
+      if (da !== db) return da - db;
+
+      const ad = `${a.event_date || ""} ${a.event_time || ""}`;
+      const bd = `${b.event_date || ""} ${b.event_time || ""}`;
+
+      return ad.localeCompare(bd);
+    });
+
+    return list;
+  }, [posts, selectedCategory, dateFilter, feeFilter, search]);
+
+  const visiblePosts = filteredPosts.slice(0, visibleCount);
 
   return (
-    <div className="home-page">
-      <div className="animated-bg"></div>
+    <div className="cn-page home-v2-page">
+      {message && <div className="cn-form-note home-toast">✅ {message}</div>}
 
-      <Sidebar active="home" />
+      <HomeHero
+        user={savedUser}
+        locating={locating}
+        onActivateLocalRadar={activateLocalRadar}
+      />
 
-      <main className="main-content">
-        <Topbar
-          title={`Welcome Back, ${savedUser.name} 👋`}
-          subtitle="Discover people, opportunities and events around you"
-        />
+      <AISearchCard
+        value={search}
+        onChange={setSearch}
+        placeholder={aiPrompts[promptIndex]}
+      />
 
-        {message && (
-          <div className="success-box" style={{ marginBottom: 20 }}>
-            ✅ {message}
+      <DiscoveryChips />
+
+      <HomeFilters
+        categories={categories}
+        selectedCategory={selectedCategory}
+        dateFilter={dateFilter}
+        feeFilter={feeFilter}
+        onCategoryChange={handleCategoryChange}
+        onDateFilterChange={handleDateFilterChange}
+        onFeeFilterChange={handleFeeFilterChange}
+      />
+
+      <div className="home-section-row">
+        <div>
+          <p className="cn-page-kicker">Local Pulse</p>
+          <h2 className="home-section-title">Happening Around Me</h2>
+          <p className="home-section-subtitle">Fresh local signals from your active city.</p>
+        </div>
+
+        <span className="cn-badge cn-badge-blue">{filteredPosts.length} results</span>
+      </div>
+
+      {loading ? (
+        <div className="cn-empty">
+          <div className="cn-empty-icon">
+            <Sparkles size={26} />
           </div>
-        )}
-
-        <div className="ai-card">
-          <div className="ai-header">
-            <Sparkles size={24} />
-            <h2>Need Help?</h2>
-          </div>
-
-          <p className="ai-line">
-            Tell us what you need. We will help connect you with people nearby.
+          <h2 className="cn-empty-title">Loading local pulse...</h2>
+          <p className="cn-empty-text">
+            Fetching people, posts, events and opportunities around your active city.
           </p>
+        </div>
+      ) : filteredPosts.length === 0 ? (
+        <div className="cn-empty">
+          <div className="cn-empty-icon">
+            <Sparkles size={26} />
+          </div>
 
-          <div className="ai-search">
-            <Search size={20} />
-            <input placeholder={aiPrompts[promptIndex]} />
+          <h2 className="cn-empty-title">No local signals yet</h2>
+
+          <p className="cn-empty-text">
+            Your locality may not be quiet in real life. Be the first to reveal something useful — an event, help request, gig, service or community update.
+          </p>
+          <div className="home-empty-actions">
+            <a className="cn-btn cn-btn-primary" href="/create-post">Create a Post</a>
+            <a className="cn-btn cn-btn-secondary" href="/network">Discover People</a>
           </div>
         </div>
-
-        <div className="category-section">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              className={selectedCategory === cat ? "chip active-chip" : "chip"}
-              onClick={() => setSelectedCategory(cat)}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        <h2 className="section-title">Happening Around Me</h2>
-
-        {loading ? (
-          <div className="ai-card">
-            <h2>Loading posts...</h2>
-          </div>
-        ) : filteredPosts.length === 0 ? (
-          <div className="ai-card">
-            <h2>No posts yet</h2>
-            <p className="ai-line">
-              Create the first community post around your locality.
-            </p>
-          </div>
-        ) : (
-          <div className="premium-home-feed">
-            {filteredPosts.map((post) => (
-              <div className="premium-feed-card" key={post.post_id}>
-                <div className="premium-feed-top">
-                  <div className="premium-feed-avatar">
-                    {post.user_name?.charAt(0) || "U"}
-                  </div>
-
-                  <div>
-                    <h3>{post.title}</h3>
-
-                    <p>
-                      @{post.user_name || "ConnectNow User"} ·{" "}
-                      {post.location || "Nearby"}
-                    </p>
-                  </div>
-
-                  <span className="premium-category-chip">
-                    {post.category === "Other"
-                      ? post.custom_category || "Other"
-                      : post.category}
-                  </span>
-                </div>
-
-                <p className="premium-feed-desc">{post.short_description}</p>
-
-                <div className="premium-feed-meta">
-                  <span>
-                    <MapPin size={14} />
-                    {post.location || "Nearby"}
-                  </span>
-
-                  <span>
-                    <CalendarDays size={14} />
-                    {getDayName(post.event_date)}
-                  </span>
-
-                  <span>
-                    <Clock size={14} />
-                    {formatDate(post.event_date)} ·{" "}
-                    {post.event_time || "Time not added"}
-                  </span>
-                </div>
-
-                <div className="premium-feed-actions">
-                  <button
-                    className={post.is_liked_by_me ? "heart-btn liked" : "heart-btn"}
-                    onClick={() => handleLike(post)}
-                  >
-                    <Heart
-                      size={17}
-                      fill={post.is_liked_by_me ? "currentColor" : "none"}
-                    />
-                    {post.like_count || 0}
-                  </button>
-
-                  <button
-                    onClick={() => openPrivateReply(post)}
-                    disabled={!post.allow_private_replies}
-                    className={!post.allow_private_replies ? "disabled-action-btn" : ""}
-                  >
-                    <MessageCircle size={16} />
-                    Private Reply
-                  </button>
-
-                  <button onClick={() => setSelectedPost(post)}>
-                    View Details
-                    <ArrowRight size={16} />
-                  </button>
-
-                  <button onClick={() => setReportingPost(post)}>
-                    <Flag size={16} />
-                    Report
-                  </button>
-                </div>
-              </div>
+      ) : (
+        <>
+          <div className="cn-feed-grid home-post-grid">
+            {visiblePosts.map((post) => (
+              <PostCard
+                key={post.post_id}
+                post={post}
+                onLike={handleLike}
+                onSave={handleSave}
+                onReply={openPrivateReply}
+                onViewMore={setSelectedPost}
+                onShare={handleShare}
+                onReport={setReportingPost}
+              />
             ))}
           </div>
-        )}
-      </main>
 
-      {selectedPost && (
-        <div className="modal-overlay" onClick={() => setSelectedPost(null)}>
-          <div
-            className="modal-card premium-post-detail-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="close-btn" onClick={() => setSelectedPost(null)}>
-              <X />
-            </button>
-
-            <span className="premium-category-chip modal-chip">
-              {selectedPost.category === "Other"
-                ? selectedPost.custom_category || "Other"
-                : selectedPost.category}
-            </span>
-
-            <h2>{selectedPost.title}</h2>
-
-            <p className="modal-subtitle">
-              @{selectedPost.user_name || "ConnectNow User"} ·{" "}
-              {selectedPost.location || "Nearby"}
-            </p>
-
-            <p>{selectedPost.detailed_description}</p>
-
-            <div className="modal-info">
-              <span>
-                <MapPin size={16} />
-                {selectedPost.location || "Nearby"}
-              </span>
-
-              <span>
-                <CalendarDays size={16} />
-                {getDayName(selectedPost.event_date)}
-              </span>
-
-              <span>
-                <Clock size={16} />
-                {formatDate(selectedPost.event_date)} ·{" "}
-                {selectedPost.event_time || "Time not added"}
-              </span>
-            </div>
-
-            <div className="premium-feed-actions modal-actions">
+          {visibleCount < filteredPosts.length && (
+            <div className="home-load-more">
               <button
-                className={
-                  selectedPost.is_liked_by_me ? "heart-btn liked" : "heart-btn"
-                }
-                onClick={() => handleLike(selectedPost)}
+                className="cn-btn cn-btn-secondary"
+                onClick={() => setVisibleCount((prev) => prev + 16)}
+                type="button"
               >
-                <Heart
-                  size={17}
-                  fill={selectedPost.is_liked_by_me ? "currentColor" : "none"}
-                />
-                {selectedPost.like_count || 0}
-              </button>
-
-              <button
-                onClick={() => openPrivateReply(selectedPost)}
-                disabled={!selectedPost.allow_private_replies}
-                className={
-                  !selectedPost.allow_private_replies
-                    ? "disabled-action-btn"
-                    : ""
-                }
-              >
-                <MessageCircle size={16} />
-                Private Reply
-              </button>
-
-              <button onClick={() => setReportingPost(selectedPost)}>
-                <Flag size={16} />
-                Report
+                Load More
               </button>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
-      {replyPost && (
-        <div className="modal-overlay" onClick={() => setReplyPost(null)}>
-          <div
-            className="modal-card private-reply-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="close-btn" onClick={() => setReplyPost(null)}>
-              <X />
-            </button>
+      <PostDetailModal
+        post={selectedPost}
+        onClose={() => setSelectedPost(null)}
+        onLike={handleLike}
+        onSave={handleSave}
+        onReply={openPrivateReply}
+        onShare={handleShare}
+        onReport={setReportingPost}
+      />
 
-            <h2>Private Reply</h2>
+      <ReplyModal
+        post={replyPost}
+        replyText={replyText}
+        onReplyTextChange={setReplyText}
+        onClose={() => setReplyPost(null)}
+        onSubmit={submitPrivateReply}
+      />
 
-            <p className="modal-subtitle">
-              Reply privately to @{replyPost.user_name || "ConnectNow User"} about this post.
-            </p>
-
-            <div className="private-reply-post-preview">
-              <span>
-                {replyPost.category === "Other"
-                  ? replyPost.custom_category || "Other"
-                  : replyPost.category}
-              </span>
-
-              <h3>{replyPost.title}</h3>
-
-              <p>{replyPost.short_description}</p>
-            </div>
-
-            <label>Your Message</label>
-
-            <textarea
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Write your private message..."
-            />
-
-            <button className="save-btn" onClick={submitPrivateReply}>
-              <Send size={16} />
-              Send Private Reply
-            </button>
-          </div>
-        </div>
-      )}
-
-      {reportingPost && (
-        <div className="modal-overlay" onClick={() => setReportingPost(null)}>
-          <div
-            className="modal-card report-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="close-btn" onClick={() => setReportingPost(null)}>
-              <X />
-            </button>
-
-            <h2>Report Post</h2>
-
-            <p className="modal-subtitle">
-              Tell us why you are reporting this post.
-            </p>
-
-            <label>Reason</label>
-
-            <select
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value)}
-            >
-              <option value="Abuse">Abuse</option>
-              <option value="Sexual">Sexual</option>
-              <option value="Fraud">Fraud</option>
-              <option value="Other">Other</option>
-            </select>
-
-            {reportReason === "Other" && (
-              <>
-                <label>Specify reason</label>
-
-                <textarea
-                  value={otherReason}
-                  onChange={(e) => setOtherReason(e.target.value)}
-                  placeholder="Write within 15 words..."
-                />
-              </>
-            )}
-
-            <button className="save-btn" onClick={submitReport}>
-              Submit Report
-            </button>
-          </div>
-        </div>
-      )}
+      <ReportModal
+        post={reportingPost}
+        reportReason={reportReason}
+        otherReason={otherReason}
+        onReasonChange={setReportReason}
+        onOtherReasonChange={setOtherReason}
+        onClose={() => setReportingPost(null)}
+        onSubmit={submitReport}
+      />
     </div>
   );
 }
