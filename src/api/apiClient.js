@@ -1,4 +1,4 @@
-const API_BASE = "https://connectnow-40rl.onrender.com/api";
+const API_BASE = "/api";
 
 export function getToken() {
   return localStorage.getItem("token");
